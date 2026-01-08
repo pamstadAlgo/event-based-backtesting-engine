@@ -1,4 +1,4 @@
-from backtester.events import MarketEvent, BuyEvent
+from events import MarketEvent, BuyEvent
 from sqlalchemy import text
 from strategy import Strategy
 

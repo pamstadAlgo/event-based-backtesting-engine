@@ -1,0 +1,2 @@
+symbol,period_end_date,price,reason
+WLDN:US,2006-12-29,10.0,Penman TTM as-of 2006-12-29: value=61.58 >= close=10.00 * (1+MOS 50%)

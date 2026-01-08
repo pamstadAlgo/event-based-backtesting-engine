@@ -1,7 +1,7 @@
 import csv
 from pathlib import Path
 
-from backtester.events import BuyEvent
+from events import BuyEvent
 
 
 class CsvBuyWriter:

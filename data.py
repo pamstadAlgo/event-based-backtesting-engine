@@ -12,13 +12,13 @@ class PostgresDataHandler:
 
     def stream(self):
         sql = text("""
-            SELECT symbol, period_end_date
-            FROM financial_periods
-            WHERE symbol = ANY(:symbols)
-            ORDER BY period_end_date ASC, symbol ASC
+            SELECT qfs_symbol_id, period_end_date
+            FROM quickfs_dj_balancesheetquarter
+            WHERE qfs_symbol_id = ANY(:symbols)
+            ORDER BY period_end_date ASC, qfs_symbol_id ASC
         """)
 
         with self.engine.connect() as conn:
             result = conn.execute(sql, {"symbols": self.symbols})
             for row in result:
-                yield row.symbol, row.period_end_date
+                yield row.qfs_symbol_id, row.period_end_date

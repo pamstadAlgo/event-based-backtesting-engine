@@ -1,16 +1,33 @@
 from sqlalchemy import create_engine
+from dotenv import load_dotenv
+import os
+from engine import BacktestEngine
+from SimpleFundamentalStrategy import SimpleFundamentalStrategy
+from PenmanTTMStrategy import PenmanTTMAsOfStrategy, PenmanConfig
+from priceprovider import StooqPriceProvider
 
-from backtester.engine import BacktestEngine
-from backtester.strategy import SimpleFundamentalStrategy
-
+load_dotenv()
 
 def main():
-    db_url = "postgresql+psycopg2://user:password@localhost:5432/mydb"
-    symbols = ["AAPL", "MSFT", "GOOG"]
+    #get db connection variables
+    user = os.environ["POSTGRES_USER"]
+    password = os.environ["POSTGRES_PASSWORD"]
+    host = os.environ["DB_HOST"]
+    port = os.environ["DB_PORT"]
+    db = os.environ["POSTGRES_DB"]
+
+    # URL-encode password to avoid issues with special characters
+    #password_encoded = quote_plus(password)
+
+    #db_url = "postgresql+psycopg2://user:password@localhost:5432/mydb"
+    db_url = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}"
+    
+    symbols = ["WLDN:US"]
 
     # One shared Engine for the strategy (simple and efficient)
     engine = create_engine(db_url, future=True)
-    strategy = SimpleFundamentalStrategy(engine=engine)
+    #strategy = SimpleFundamentalStrategy(engine=engine)
+    strategy = PenmanTTMAsOfStrategy(engine, PenmanConfig(), StooqPriceProvider())
 
     bt = BacktestEngine(
         db_url=db_url,
