@@ -2,6 +2,9 @@ import pandas as pd
 from pathlib import Path
 import matplotlib.pyplot as plt
 
+SYMBOL = "CELH:US"
+
+
 def read_symbol_safe(root="data", dataset="valuations_penman_ttm", symbol="WLDN:US"):
     path = Path(root) / dataset / f"symbol={symbol}"
     files = sorted(path.glob("*.parquet"))
@@ -22,7 +25,7 @@ def read_symbol_safe(root="data", dataset="valuations_penman_ttm", symbol="WLDN:
     df["symbol"] = symbol
     return df
 
-df = read_symbol_safe(symbol="WLDN:US")
+df = read_symbol_safe(symbol=SYMBOL)
 print(df)
 
 
@@ -37,7 +40,7 @@ plt.plot(df["asof_date"], df["close"], label="Close Price")
 
 plt.xlabel("Date")
 plt.ylabel("Price")
-plt.title("WLDN:US – Penman Value vs Market Price")
+plt.title(f"{SYMBOL} – Penman Value vs Market Price")
 plt.legend()
 plt.grid(True)
 

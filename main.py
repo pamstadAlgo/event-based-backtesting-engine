@@ -23,7 +23,7 @@ def main():
     #db_url = "postgresql+psycopg2://user:password@localhost:5432/mydb"
     db_url = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}"
     
-    symbols = ["WLDN:US"]
+    symbols = ["WLDN:US", "LEU:US", "NSSC:US", "IDR:US", "CELH:US", "INOD:US", "PVLA", "KTEL", "LUNA"]
 
     # One shared Engine for the strategy (simple and efficient)
     engine = create_engine(db_url, future=True)

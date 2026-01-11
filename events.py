@@ -13,5 +13,10 @@ class MarketEvent:
 class BuyEvent:
     symbol: str
     period_end_date: date
-    price: Optional[float]
+    close_price: Optional[float]
+    intrinsic_value: Optional[float]
+    bps: Optional[float] # book value per share
+    rnoa: Optional[float]
+    mos: Optional[float] #margin of safety
+    nr_shares: Optional[float]
     reason: str = ""

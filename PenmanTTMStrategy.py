@@ -195,6 +195,7 @@ class PenmanTTMAsOfStrategy(Strategy):
                 "period_bucket": event.period_end_date.isoformat(),
                 "close": close,
                 "equity_val_per_share": float(value),
+                "b0": res.get("b0"),
                 "equity_val_total": res.get("equity_val_total"),
                 "shares_diluted": res.get("shares_diluted"),
                 "residual_earnings": res.get("residual_earnings"),
@@ -214,7 +215,12 @@ class PenmanTTMAsOfStrategy(Strategy):
             return BuyEvent(
                 symbol=event.symbol,
                 period_end_date=asof_date,  # log the real tradable date
-                price=close,
+                close_price=close,
+                intrinsic_value=value,
+                bps=res.get("b0")/res.get("shares_diluted"),
+                rnoa=res.get("rnoa"),
+                mos=(value - close)/value,
+                nr_shares=res.get("shares_diluted"),
                 reason=reason,
             )
 
