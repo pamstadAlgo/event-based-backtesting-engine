@@ -73,12 +73,8 @@ class StooqPriceProvider:
         last_dom = calendar.monthrange(year, month)[1]
         month_end = date(year, month, last_dom)
 
-        print('month_end: ', month_end)
-        print('month_start: ', month_start)
-
         # slice using date-index
         m = df.loc[(df.index >= month_start) & (df.index <= month_end)]
-        print('m: ', m)
         if m.empty:
             return None, None
 

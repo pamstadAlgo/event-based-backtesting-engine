@@ -5,6 +5,7 @@ from engine import BacktestEngine
 from SimpleFundamentalStrategy import SimpleFundamentalStrategy
 from PenmanTTMStrategy import PenmanTTMAsOfStrategy, PenmanConfig
 from priceprovider import StooqPriceProvider
+from store import ParquetRecordStore
 
 load_dotenv()
 
@@ -26,8 +27,12 @@ def main():
 
     # One shared Engine for the strategy (simple and efficient)
     engine = create_engine(db_url, future=True)
+
+    #store will be used to store time series of equity valuations
+    store = ParquetRecordStore(root_dir="data")
+
     #strategy = SimpleFundamentalStrategy(engine=engine)
-    strategy = PenmanTTMAsOfStrategy(engine, PenmanConfig(), StooqPriceProvider())
+    strategy = PenmanTTMAsOfStrategy(engine, PenmanConfig(), StooqPriceProvider(), store=store)
 
     bt = BacktestEngine(
         db_url=db_url,

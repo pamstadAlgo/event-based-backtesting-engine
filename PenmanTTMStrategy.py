@@ -7,7 +7,8 @@ from datetime import date
 from priceprovider import StooqPriceProvider
 from events import MarketEvent, BuyEvent
 from strategy import Strategy
-
+from typing import List
+from store import ParquetRecordStore
 
 # -----------------------------
 # Config
@@ -30,10 +31,11 @@ class PenmanTTMAsOfStrategy(Strategy):
     - all fundamentals queries are anchored to <= asof_date (no look-ahead)
     """
 
-    def __init__(self, engine, cfg: PenmanConfig, price_provider: StooqPriceProvider):
+    def __init__(self, engine, cfg: PenmanConfig, price_provider: StooqPriceProvider, store: ParquetRecordStore):
         super().__init__(engine)
         self.cfg = cfg
         self.prices = price_provider
+        self.store = store
 
     def equity_val_penman_ttm_asof(self, symbol: str, asof_date: date):
         """
@@ -60,6 +62,7 @@ class PenmanTTMAsOfStrategy(Strategy):
                 ORDER BY period_end_date DESC
                 LIMIT 4
             ) t
+            HAVING COUNT(*) = 4
         ),
 
         -- Rank balance sheet quarters as-of date (latest first)
@@ -138,10 +141,40 @@ class PenmanTTMAsOfStrategy(Strategy):
 
         return row  # dict-like mapping or None
 
+    def has_valid_last4_quarters(self, symbol: str, asof: date) -> bool:
+        """
+        Function that checks if the last four entries are actually four quarters apart. For some companies, mainly on OTC, they are not required to file quarterly, so the last four entries in quarterly tables can be spaced 4 years apart and not 12 months
+        """
+        last_4_dates_sql = text("""
+        SELECT period_end_date
+        FROM quickfs_dj_incomestatementquarter
+        WHERE qfs_symbol_id = :symbol
+        AND period_end_date <= :asof
+        ORDER BY period_end_date DESC
+        LIMIT 4;
+        """)
+
+        with self.engine.connect() as conn:
+            dates: List[date] = conn.execute(last_4_dates_sql, {"symbol": symbol, "asof": asof}).scalars().all()
+
+        #if there are less than four data points available, skip
+        if len(dates) != 4:
+            return False
+    
+        #check that newst and oldest date are at max 1 year apart
+        newest = dates[0]
+        oldest = dates[-1]
+
+        return (newest.year - oldest.year) <= 1
+
     def on_market(self, event: MarketEvent) -> BuyEvent | None:
         # event.period_end_date is 01-MM-YYYY (month bucket)
         asof_date, close = self.prices.last_close_in_month(event.symbol, event.period_end_date)
         if close is None or close < self.cfg.min_price:
+            return None
+        
+        #check if last four data points are valid to compute the penman equity val
+        if not self.has_valid_last4_quarters(event.symbol, asof_date):
             return None
 
         # Compute Penman valuation anchored to asof_date (no look-ahead)
@@ -152,6 +185,25 @@ class PenmanTTMAsOfStrategy(Strategy):
         value = res.get("equity_val_per_share")
         if value is None or value <= 0:
             return None
+        
+        #store result of penman computation as a time series
+        self.store.append(
+            dataset="valuations_penman_ttm",
+            record={
+                "symbol": event.symbol,
+                "asof_date": asof_date.isoformat(),
+                "period_bucket": event.period_end_date.isoformat(),
+                "close": close,
+                "equity_val_per_share": float(value),
+                "equity_val_total": res.get("equity_val_total"),
+                "shares_diluted": res.get("shares_diluted"),
+                "residual_earnings": res.get("residual_earnings"),
+                "rnoa": res.get("rnoa"),
+                "wacc": float(self.cfg.wacc),
+                "tax_rate": float(self.cfg.tax_rate),
+            },
+            partition_cols=["symbol"],
+        )
 
         threshold = close * (1.0 + self.cfg.margin_of_safety)
         if value >= threshold:
