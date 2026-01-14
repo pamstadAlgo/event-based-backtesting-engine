@@ -1,9 +1,9 @@
 import queue
 
-from backtester.events import MarketEvent, BuyEvent
-from backtester.data import PostgresDataHandler
-from backtester.sink import CsvBuyWriter
-from backtester.strategy import Strategy
+from events import MarketEvent, BuyEvent
+from data import PostgresDataHandler
+from sink import CsvBuyWriter
+from strategy import Strategy
 
 
 class BacktestEngine:

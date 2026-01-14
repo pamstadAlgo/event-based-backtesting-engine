@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from sqlalchemy.engine import Engine
 from sqlalchemy import text
 
-from backtester.events import MarketEvent, BuyEvent
+from events import MarketEvent, BuyEvent
 
 
 class Strategy(ABC):
