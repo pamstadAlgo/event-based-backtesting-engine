@@ -4,7 +4,7 @@ import pandas_datareader.data as web
 from sqlalchemy import text
 from dataclasses import dataclass
 from datetime import date
-from priceprovider import StooqPriceProvider
+from priceprovider import StooqPriceProvider, LocalStooqPriceProvider
 from events import MarketEvent, BuyEvent
 from strategy import Strategy
 from typing import List
@@ -17,7 +17,7 @@ from store import ParquetRecordStore
 class PenmanConfig:
     wacc: float = 0.10
     tax_rate: float = 0.30
-    margin_of_safety: float = 0.50  # buy if value >= price*(1+MOS)
+    margin_of_safety: float = 0.70  # buy if value >= price*(1+MOS)
     min_price: float = 0.01
 
 # -----------------------------
@@ -31,7 +31,7 @@ class PenmanTTMAsOfStrategy(Strategy):
     - all fundamentals queries are anchored to <= asof_date (no look-ahead)
     """
 
-    def __init__(self, engine, cfg: PenmanConfig, price_provider: StooqPriceProvider, store: ParquetRecordStore):
+    def __init__(self, engine, cfg: PenmanConfig, price_provider: LocalStooqPriceProvider, store: ParquetRecordStore):
         super().__init__(engine)
         self.cfg = cfg
         self.prices = price_provider
@@ -168,7 +168,6 @@ class PenmanTTMAsOfStrategy(Strategy):
         return (newest.year - oldest.year) <= 1
 
     def on_market(self, event: MarketEvent) -> BuyEvent | None:
-        # event.period_end_date is 01-MM-YYYY (month bucket)
         asof_date, close = self.prices.last_close_in_month(event.symbol, event.period_end_date)
         if close is None or close < self.cfg.min_price:
             return None

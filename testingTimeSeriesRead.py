@@ -2,7 +2,7 @@ import pandas as pd
 from pathlib import Path
 import matplotlib.pyplot as plt
 
-SYMBOL = "CELH:US"
+SYMBOL = "XPEL:US"
 
 
 def read_symbol_safe(root="data", dataset="valuations_penman_ttm", symbol="WLDN:US"):

@@ -4,8 +4,10 @@ import os
 from engine import BacktestEngine
 from SimpleFundamentalStrategy import SimpleFundamentalStrategy
 from PenmanTTMStrategy import PenmanTTMAsOfStrategy, PenmanConfig
-from priceprovider import StooqPriceProvider
+from priceprovider import StooqPriceProvider, LocalStooqPriceProvider
 from store import ParquetRecordStore
+from extract_tickers import extractTickers
+from pathlib import Path
 
 load_dotenv()
 
@@ -23,16 +25,22 @@ def main():
     #db_url = "postgresql+psycopg2://user:password@localhost:5432/mydb"
     db_url = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}"
     
-    symbols = ["WLDN:US", "LEU:US", "NSSC:US", "IDR:US", "CELH:US", "INOD:US", "PVLA", "KTEL", "LUNA"]
+
+    symbols = extractTickers()
+    print('these are tickers: ', symbols[:20])
+   # symbols = ["WLDN:US", "LEU:US", "NSSC:US", "IDR:US", "CELH:US", "INOD:US", "PVLA", "KTEL", "LUNA"]
 
     # One shared Engine for the strategy (simple and efficient)
     engine = create_engine(db_url, future=True)
+
+    #initalize the price provider
+    price_provider = LocalStooqPriceProvider(root=Path("stooq_daily_data"))
 
     #store will be used to store time series of equity valuations
     store = ParquetRecordStore(root_dir="data")
 
     #strategy = SimpleFundamentalStrategy(engine=engine)
-    strategy = PenmanTTMAsOfStrategy(engine, PenmanConfig(), StooqPriceProvider(), store=store)
+    strategy = PenmanTTMAsOfStrategy(engine, PenmanConfig(), price_provider=price_provider, store=store)
 
     bt = BacktestEngine(
         db_url=db_url,
