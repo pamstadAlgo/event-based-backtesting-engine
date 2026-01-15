@@ -4,7 +4,7 @@ import os
 from engine import BacktestEngine
 from SimpleFundamentalStrategy import SimpleFundamentalStrategy
 from PenmanTTMStrategy import PenmanTTMAsOfStrategy, PenmanConfig
-from priceprovider import StooqPriceProvider, LocalStooqPriceProvider
+from priceprovider import StooqPriceProvider, LocalStooqPriceProvider, EODHDPriceProvider
 from store import ParquetRecordStore
 from extract_tickers import extractTickers
 from pathlib import Path
@@ -34,7 +34,8 @@ def main():
     engine = create_engine(db_url, future=True)
 
     #initalize the price provider
-    price_provider = LocalStooqPriceProvider(root=Path("stooq_daily_data"))
+    # price_provider = LocalStooqPriceProvider(root=Path("stooq_daily_data"))
+    price_provider = EODHDPriceProvider(engine)
 
     #store will be used to store time series of equity valuations
     store = ParquetRecordStore(root_dir="data")

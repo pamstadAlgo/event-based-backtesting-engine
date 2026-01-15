@@ -3,6 +3,11 @@ import pandas_datareader.data as web
 import calendar
 from datetime import date, datetime
 from pathlib import Path
+from sqlalchemy import text
+from helpers import EXCHANGE_MAPPING
+import os
+from io import StringIO
+import requests
 
 MISSING_SYMBOLS_FILE = Path("output/missing_price_symbols.txt")
 MISSING_SYMBOLS_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -12,6 +17,129 @@ MISSING_SYMBOLS_FILE.parent.mkdir(parents=True, exist_ok=True)
 # class LocalStooqConfig:
 #     root: Path  # e.g. Path("stooq_daily_data")
 #     missing_log: Path = Path("output/missing_price_symbols.txt")
+
+
+class EODHDPriceProvider:
+    """
+    Gets daily price history from https://eodhd.com/
+    """
+    def __init__(self, engine):
+        self.date_col_name = "Date"
+        self.close_price_col_name = "Close"
+        self.engine = engine
+        self._cache: dict[str, pd.DataFrame] = {}     # symbol -> df
+
+    def _log_missing_symbols(self, symbol, candidates):
+        # ts = datetime.utcnow().isoformat(timespec="seconds")
+        line = f"{symbol} | tried={candidates}\n"
+
+        with MISSING_SYMBOLS_FILE.open("a") as f:
+            f.write(line)
+
+    def _exchange(self, qfs_symbol: str) -> str | None:
+        """
+        returns exchange for a given qfs symbol
+        """
+        query = text("""
+            SELECT exchange
+            from quickfs_dj_tradedcompanies
+            where qfs_symbol = :symbol
+            """)
+
+        with self.engine.connect() as conn:
+            exchange = conn.execute(query, {"symbol" : qfs_symbol}).scalar_one()
+            return exchange
+    
+        return None
+
+    def _transform_symbol(self, qfs_symbol: str) -> list[str] | None:
+        #parse everything after : of qfs symbol
+        if ":" in qfs_symbol:
+            ticker, country_code = qfs_symbol.split(":")
+
+            #get exchange of symbol
+            exchange = self._exchange(qfs_symbol)
+
+            #check if country_code$exchange exists in mapping dict
+            try:
+                eodhd_symbols = []
+
+                for exchg in EXCHANGE_MAPPING[f'{country_code}${exchange}']:
+                    eodhd_symbols.append(f"{ticker}.{exchg}")
+                # #TO-DO: SYMBOLS SHOULD BE A LIST OF CANDIDATES; FOR EXAMPLE FOR LONDON WE HAVE AMBIGIOUS/MULTIPLE EXCHANGES
+                # eodhd_symbol = f"{ticker}.{EXCHANGE_MAPPING[f'{country_code}${exchange}']}"
+                return eodhd_symbols
+            except Exception as e:
+                print(f'{qfs_symbol} not able to transform for EODHD')
+                return None
+
+        return None
+    
+    def _load_symbol(self, symbol: str) -> pd.DataFrame:
+        #check if historical price data has already been downloaded
+        if symbol in self._cache:
+            return self._cache[symbol]
+        
+        #if symbol not yet in cache, fetch from API endpoint
+        #transform qfs symbol to eodhd symbol
+        eodhd_symbols = self._transform_symbol(qfs_symbol=symbol)
+
+        if eodhd_symbols is not None and len(eodhd_symbols) > 0:
+            #try to fetch data from eodhd api
+            for eodhd_symbol in eodhd_symbols:
+                try:
+                    url = f"https://eodhd.com/api/eod/{eodhd_symbol}?api_token={os.environ['EODHD_API_KEY']}&fmt=csv"
+                    resp = requests.get(url)
+
+                    #read csv file
+                    df = pd.read_csv(StringIO(resp.text))
+
+                    #create index based on date
+                    df[self.date_col_name] =  pd.to_datetime(df[self.date_col_name].astype(str),format="%Y-%m-%d", errors="raise").dt.date
+                    df = df.sort_values(self.date_col_name).set_index(self.date_col_name)
+
+                    #store price data frame in cache
+                    self._cache[symbol] = df
+                    return df
+                except Exception as e:
+                    print(f"eodhd_symbol {eodhd_symbol} not available in price endpoint")
+
+            #return empty data frame if no success
+            self._log_missing_symbols(symbol=symbol, candidates=eodhd_symbols)
+
+            df = pd.DataFrame()
+            self._cache[symbol] = df
+            return df
+        else:
+            self._log_missing_symbols(symbol=symbol, candidates=eodhd_symbols)
+
+            #store empty dataframe
+            df = pd.DataFrame()
+            self._cache[symbol] = df
+            print(f"empty dataframe for symbol: {symbol}, because not able to create eodhd ticker")
+            return df
+
+    def last_close_in_month(self, symbol: str, month_start: date):
+        #load historical price data of symbol
+        df = self._load_symbol(symbol)
+
+        #if data frame is empty return none for close price and date
+        if df.empty:
+            return None, None
+        
+        #extract date range
+        year, month = month_start.year, month_start.month
+        last_dom = calendar.monthrange(year, month)[1]
+        month_end = date(year, month, last_dom)
+
+        #filter historical close price data frame
+        m = df.loc[(df.index >= month_start) & (df.index <= month_end)]
+        if m.empty:
+            return None, None
+
+        price_date = m.index[-1]
+        close = float(m[self.close_price_col_name].iloc[-1])
+        return price_date, close
 
 
 class LocalStooqPriceProvider:
