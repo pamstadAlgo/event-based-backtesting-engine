@@ -12,6 +12,7 @@ load_dotenv()
 
 INPUT_CSV = "output/buys.csv"
 OUTPUT_CSV = "buys_postprocessed.csv"
+ADJUSTED_CLOSE_PRICE_COL = ""
 
 # EODHD endpoint template
 EODHD_URL = "https://eodhd.com/api/eod/{symbol}?api_token={token}&fmt=csv"
@@ -36,11 +37,11 @@ def fetch_eod_history(eodhd_symbol: str, api_key: str, timeout=30, retries=3, ba
             # Normalize column names
             df.columns = [c.strip().lower() for c in df.columns]
 
-            if "date" not in df.columns or "close" not in df.columns:
+            if "date" not in df.columns or "adjusted_close" not in df.columns:
                 raise ValueError(f"Unexpected columns for {eodhd_symbol}: {df.columns.tolist()}")
 
             df["date"] = pd.to_datetime(df["date"], errors="coerce")
-            df = df.dropna(subset=["date", "close"]).copy()
+            df = df.dropna(subset=["date", "adjusted_close"]).copy()
             df = df.sort_values("date")
 
             return df
@@ -55,7 +56,7 @@ def fetch_eod_history(eodhd_symbol: str, api_key: str, timeout=30, retries=3, ba
 
 def compute_metrics(price_df: pd.DataFrame, buy_date: pd.Timestamp, buy_price: float) -> dict:
     """
-    price_df must contain columns ['date', 'close'] sorted by date.
+    price_df must contain columns ['date', 'adjusted_close'] sorted by date.
     We consider only rows with date strictly greater than buy_date.
     """
     after = price_df.loc[price_df["date"] > buy_date].copy()
@@ -72,8 +73,8 @@ def compute_metrics(price_df: pd.DataFrame, buy_date: pd.Timestamp, buy_price: f
         }
 
     # Max close after buy
-    idx = after["close"].idxmax()
-    max_close = float(after.loc[idx, "close"])
+    idx = after["adjusted_close"].idxmax()
+    max_close = float(after.loc[idx, "adjusted_close"])
     max_date = after.loc[idx, "date"]
 
     max_return = (max_close - buy_price) / buy_price
@@ -81,7 +82,7 @@ def compute_metrics(price_df: pd.DataFrame, buy_date: pd.Timestamp, buy_price: f
 
     # Doubling: first date where close >= 2 * buy_price
     target = 2.0 * buy_price
-    doubled = after.loc[after["close"] >= target].copy()
+    doubled = after.loc[after["adjusted_close"] >= target].copy()
     if doubled.empty:
         double_date = None
         days_to_double = None
@@ -101,13 +102,12 @@ def compute_metrics(price_df: pd.DataFrame, buy_date: pd.Timestamp, buy_price: f
 
 def main():
     api_key = os.environ['EODHD_API_KEY']
-    print('api key: ', api_key)
     if not api_key:
         raise RuntimeError("Missing environment variable EODHD_API_KEY")
 
     df = pd.read_csv(INPUT_CSV)
     df["period_end_date"] = pd.to_datetime(df["period_end_date"], errors="coerce")
-    df = df.dropna(subset=["symbol", "period_end_date", "close_price"]).copy()
+    df = df.dropna(subset=["symbol", "period_end_date", "adj_close_price"]).copy()
 
     # Keep only earliest entry per symbol
     df = df.sort_values(["symbol", "period_end_date"])
@@ -121,18 +121,17 @@ def main():
 
     db_url = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}"
 
-
     #create db engine to fetch exchange of symbol
     engine = create_engine(db_url, future=True)
 
+    #initialize EODHD class to fetch prices
     price_provider = EODHDPriceProvider(engine)
-
 
     results = []
     for _, row in df_earliest.iterrows():
         symbol = str(row["symbol"])
         buy_date = pd.Timestamp(row["period_end_date"])
-        buy_price = float(row["close_price"])
+        buy_price = float(row["adj_close_price"])
 
         #eodhd_symbol = to_eodhd_symbol(symbol)
         eodhd_symbols = price_provider._transform_symbol(symbol)
@@ -168,7 +167,7 @@ def main():
         results.append(out_row)
 
         # Be nice to the API (basic rate-limiting)
-        time.sleep(0.2)
+        # time.sleep(0.2)
 
     out_df = pd.DataFrame(results)
 

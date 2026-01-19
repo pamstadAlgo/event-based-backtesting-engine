@@ -20,6 +20,6 @@ class PostgresDataHandler:
         """)
 
         with self.engine.connect() as conn:
-            result = conn.execute(sql, {"symbols": self.symbols})
+            result = conn.execute(sql, {"symbols": self.symbols, "start_date" : self.start_date})
             for row in result:
                 yield row.qfs_symbol_id, row.period_end_date
