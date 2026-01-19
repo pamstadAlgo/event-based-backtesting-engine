@@ -8,7 +8,7 @@ from priceprovider import StooqPriceProvider, LocalStooqPriceProvider, EODHDPric
 from store import ParquetRecordStore
 from extract_tickers import extractTickers
 from pathlib import Path
-
+from datetime import date
 load_dotenv()
 
 def main():
@@ -21,6 +21,9 @@ def main():
 
     # URL-encode password to avoid issues with special characters
     #password_encoded = quote_plus(password)
+
+    start_date = date(2000, 1, 1) # YYYY, MM, DD
+
 
     #db_url = "postgresql+psycopg2://user:password@localhost:5432/mydb"
     db_url = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}"
@@ -48,6 +51,7 @@ def main():
         symbols=symbols,
         out_csv="output/buys.csv",
         strategy=strategy,
+        start_date=start_date
     )
     bt.run()
 

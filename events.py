@@ -14,6 +14,7 @@ class BuyEvent:
     symbol: str
     period_end_date: date
     close_price: Optional[float]
+    adj_close_price: Optional[float]
     intrinsic_value: Optional[float]
     bps: Optional[float] # book value per share
     rnoa: Optional[float]

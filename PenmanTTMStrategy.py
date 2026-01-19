@@ -211,6 +211,9 @@ class PenmanTTMAsOfStrategy(Strategy):
                 f"Penman TTM as-of {asof_date}: value={value:.2f} "
                 f">= close={close:.2f} * (1+MOS {self.cfg.margin_of_safety:.0%})"
             )
+
+            #also fetch adjusted close price (this will be used to compute performance of a stock)
+
             return BuyEvent(
                 symbol=event.symbol,
                 period_end_date=asof_date,  # log the real tradable date
@@ -218,7 +221,7 @@ class PenmanTTMAsOfStrategy(Strategy):
                 intrinsic_value=value,
                 bps=res.get("b0")/res.get("shares_diluted"),
                 rnoa=res.get("rnoa"),
-                mos=(value - close)/value,
+                mos=(value - close)/close,
                 nr_shares=res.get("shares_diluted"),
                 reason=reason,
             )

@@ -26,6 +26,7 @@ class EODHDPriceProvider:
     def __init__(self, engine):
         self.date_col_name = "Date"
         self.close_price_col_name = "Close"
+        self.adj_close_price_col_name = "Adjusted_close"
         self.engine = engine
         self._cache: dict[str, pd.DataFrame] = {}     # symbol -> df
 
@@ -118,6 +119,27 @@ class EODHDPriceProvider:
             self._cache[symbol] = df
             print(f"empty dataframe for symbol: {symbol}, because not able to create eodhd ticker")
             return df
+
+    def last_adj_close_in_month(self, symbol: str, month_start: date):
+        df = self._load_symbol(symbol)
+
+        #if data frame is empty return none for close price and date
+        if df.empty:
+            return None, None
+        
+        #extract date range
+        year, month = month_start.year, month_start.month
+        last_dom = calendar.monthrange(year, month)[1]
+        month_end = date(year, month, last_dom)
+
+        #filter historical close price data frame
+        m = df.loc[(df.index >= month_start) & (df.index <= month_end)]
+        if m.empty:
+            return None, None
+
+        price_date = m.index[-1]
+        close = float(m[self.adj_close_price_col_name].iloc[-1])
+        return price_date, close
 
     def last_close_in_month(self, symbol: str, month_start: date):
         #load historical price data of symbol

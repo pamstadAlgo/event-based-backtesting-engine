@@ -4,13 +4,13 @@ from events import MarketEvent, BuyEvent
 from data import PostgresDataHandler
 from sink import CsvBuyWriter
 from strategy import Strategy
-
+from datetime import date
 
 class BacktestEngine:
-    def __init__(self, db_url: str, symbols: list[str], out_csv: str, strategy: Strategy):
+    def __init__(self, db_url: str, symbols: list[str], out_csv: str, strategy: Strategy, start_date: date):
         self.events = queue.Queue()
 
-        self.data = PostgresDataHandler(db_url=db_url, symbols=symbols)
+        self.data = PostgresDataHandler(db_url=db_url, symbols=symbols, start_date=start_date)
         self.writer = CsvBuyWriter(out_csv)
         self.strategy = strategy  # injected
 

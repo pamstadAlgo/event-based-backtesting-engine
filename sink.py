@@ -11,7 +11,7 @@ class CsvBuyWriter:
 
         if not self.path.exists():
             with self.path.open("w", newline="", encoding="utf-8") as f:
-                csv.writer(f).writerow(["symbol", "period_end_date", "close_price", "intrinsic_value", "bps", "rnoa", "MoS", "nrShares", "reason"])
+                csv.writer(f).writerow(["symbol", "period_end_date", "close_price", "adj_close_price", "intrinsic_value", "bps", "rnoa", "MoS", "nrShares", "reason"])
 
     def write(self, buy_event: BuyEvent):
         with self.path.open("a", newline="", encoding="utf-8") as f:
@@ -19,6 +19,7 @@ class CsvBuyWriter:
                 buy_event.symbol,
                 buy_event.period_end_date.isoformat(),
                 "" if buy_event.close_price is None else buy_event.close_price,
+                "" if buy_event.adj_close_price is None else buy_event.adj_close_price,
                 "" if buy_event.intrinsic_value is None else buy_event.intrinsic_value,
                 "" if buy_event.bps is None else buy_event.bps,
                 "" if buy_event.rnoa is None else buy_event.rnoa,
